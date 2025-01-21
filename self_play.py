@@ -121,6 +121,7 @@ class SelfPlay:
         game_history.to_play_history.append(self.game.to_play())
 
         done = False
+        turn_done = False
 
         if render:
             self.game.render()
