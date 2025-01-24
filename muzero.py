@@ -435,12 +435,13 @@ class MuZero:
         # Load checkpoint
         if checkpoint_path:
             checkpoint_path = pathlib.Path(checkpoint_path)
-            self.checkpoint = torch.load(checkpoint_path)
+            self.checkpoint = torch.load(checkpoint_path, weights_only=False)
             print(f"\nUsing checkpoint from {checkpoint_path}")
 
         # Load replay buffer
-        if replay_buffer_path:
-            replay_buffer_path = pathlib.Path(replay_buffer_path)
+        replay_buffer_path = pathlib.Path(replay_buffer_path)
+        if replay_buffer_path and replay_buffer_path.exists():
+            
             with open(replay_buffer_path, "rb") as f:
                 replay_buffer_infos = pickle.load(f)
             self.replay_buffer = replay_buffer_infos["buffer"]

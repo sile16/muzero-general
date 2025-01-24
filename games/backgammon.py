@@ -9,6 +9,8 @@ import os
 
 from .abstract_game import AbstractGame
 
+
+# build python module from github.com/sile16/python-backgammon
 # Get the absolute path to the project root
 project_root = os.path.dirname(os.path.abspath(__file__))
 
@@ -49,10 +51,10 @@ class MuZeroConfig:
 
 
         ### Self-Play
-        self.num_workers = 1  # Number of simultaneous threads/workers self-playing to feed the replay buffer
+        self.num_workers = 10  # Number of simultaneous threads/workers self-playing to feed the replay buffer
         self.selfplay_on_gpu = False
-        self.max_moves = 2500  # Maximum number of moves if game is not finished before
-        self.num_simulations = 30  # Number of future moves self-simulated
+        self.max_moves = 4000  # Maximum number of moves if game is not finished before
+        self.num_simulations = 20  # Number of future moves self-simulated
         self.discount = 0.997  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping the temperature given by visit_softmax_temperature_fn to 0 (ie selecting the best action). If None, visit_softmax_temperature_fn is used every time
 
@@ -93,8 +95,8 @@ class MuZeroConfig:
         self.results_path = pathlib.Path(__file__).resolve().parents[1] / "results" / pathlib.Path(__file__).stem / datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")  # Path to store the model weights and TensorBoard logs
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
         self.training_steps = int(1000e3)  # Total number of training steps (ie weights update according to a batch)
-        self.batch_size = 128  # Number of parts of games to train on at each training step
-        self.checkpoint_interval = 500  # Number of training steps before using the model for self-playing
+        self.batch_size = 2048  # Number of parts of games to train on at each training step
+        self.checkpoint_interval = 250  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
 
@@ -112,7 +114,7 @@ class MuZeroConfig:
         ### Replay Buffer
         self.replay_buffer_size = int(1e6)  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 5  # Number of game moves to keep for every batch element
-        self.td_steps = 10  # Number of steps in the future to take into account for calculating the target value
+        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
         self.PER_alpha = 1  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
@@ -149,6 +151,7 @@ class Game(AbstractGame):
 
     def __init__(self, seed=None):
         self.bg_game = BGGame()
+        self.last_action = "None"
         if seed is not None:
             self.bg_game.randomize_seed(seed)
 
@@ -206,7 +209,7 @@ class Game(AbstractGame):
         Display the game observation.
         """
         self.bg_game.render()
-        input("Press enter to take a step ")
+        #input("Press enter to take a step ")
 
     def action_to_string(self, action_number):
         """
@@ -218,5 +221,7 @@ class Game(AbstractGame):
         Returns:
             String representing the action.
         """
-        
-        return self.bg_game.action_to_string(action_number)
+        temp = last_action.copy()
+        self.last_action = self.bg_game.action_to_string(action_number)
+
+        return temp
