@@ -10,16 +10,6 @@ import os
 from .abstract_game import AbstractGame
 
 
-# build python module from github.com/sile16/python-backgammon
-# Get the absolute path to the project root
-project_root = os.path.dirname(os.path.abspath(__file__))
-
-# Add the build/lib directory to Python's path
-build_lib_dir = os.path.abspath(os.path.join("..", 'python-backgammon', 'build', 'lib'))
-if build_lib_dir not in sys.path:
-    sys.path.insert(0, build_lib_dir)
-
-
 from bg_game import BGGame
 
 
@@ -154,6 +144,38 @@ class Game(AbstractGame):
         self.last_action = "None"
         if seed is not None:
             self.bg_game.randomize_seed(seed)
+        self.legal_actions = []
+
+    def human_to_action(self):
+        """
+        For multiplayer games, ask the user for a legal action
+        and return the corresponding action number.
+
+        Returns:
+            An integer from the action space.
+        """
+        
+
+        #get list of descriptions for each choice
+    
+   
+        self.legal_actions = self.bg_game.legal_actions()
+
+        self.legal_actions.sort()
+        choice_descriptions = {}
+        for a in self.legal_actions:
+            d = self.bg_game.action_to_string(a)
+            choice_descriptions[a] = d
+            print(f"{a}: {d}")
+
+        choice = input(f"Enter the action to play for the player {self.to_play()}: ")
+        # check if input is an integer
+
+        while not choice.isdigit() and int(choice) not in self.legal_actions:
+            choice = input("Illegal action. Enter another action : ")
+        self.last_action = choice_descriptions[int(choice)]
+        return int(choice)
+
 
     def step(self, action):
         """
@@ -183,7 +205,8 @@ class Game(AbstractGame):
         Returns:
             An array of integers, subset of the action space.
         """
-        return self.bg_game.legal_actions()
+        self.legal_actions = self.bg_game.legal_actions()
+        return self.legal_actions
 
     def reset(self):
         """
@@ -221,7 +244,7 @@ class Game(AbstractGame):
         Returns:
             String representing the action.
         """
-        temp = last_action.copy()
+        temp = self.last_action
         self.last_action = self.bg_game.action_to_string(action_number)
 
         return temp
