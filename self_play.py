@@ -334,6 +334,9 @@ class MCTS:
                 # Players play turn by turn
 
                 def get_next_player(virtual_to_play):
+                    if virtual_to_play is None:
+                        return self.config.players[0]  # Default to first player if None
+        
                     if virtual_to_play + 1 < len(self.config.players):
                         virtual_to_play = self.config.players[virtual_to_play + 1]
                     else:
@@ -347,6 +350,8 @@ class MCTS:
                     if action == self.config.player_end_turn_action:
                         virtual_to_play = get_next_player(virtual_to_play)
                         node.is_turn_complete = True
+                    else:
+                        node.is_turn_complete = False
 
             # Inside the search tree we use the dynamics function to obtain the next hidden
             # state given an action and the previous hidden state
@@ -406,20 +411,25 @@ class MCTS:
             )
             + self.config.pb_c_init
         )
-        # for multi actions/turn games , only use visit counts for complete turns
-        effective_visits = child.visit_count if child.is_turn_complete else 0
-
-        pb_c *= math.sqrt(parent.visit_count) / (effective_visits + 1) #changed from visit count to effective
+    
+        pb_c *= math.sqrt(parent.visit_count) / (child.visit_count + 1)
 
         prior_score = pb_c * child.prior
 
-        if effective_visits > 0: # changed to effective
+        if child.visit_count > 0:
             # Mean value Q
-            value_score = min_max_stats.normalize(
-                child.reward
-                + self.config.discount
-                * (child.value() if len(self.config.players) == 1 else -child.value())
-            )
+            if child.is_turn_complete: #this will be true for all single action/turn games, so shouldn't break anything
+                value_score = min_max_stats.normalize(
+                    child.reward
+                    + self.config.discount
+                    * (child.value() if len(self.config.players) == 1 else -child.value())
+                )
+            else:
+                # For incomplete turns, use a more conservative estimate
+                # This encourages exploration of unfinished sequences
+                value_score = min_max_stats.normalize(
+                    child.reward  # Only use immediate reward
+                )
         else:
             value_score = 0
 
@@ -440,11 +450,14 @@ class MCTS:
 
         elif len(self.config.players) == 2:
             for node in reversed(search_path):
+                # every node needs a visit count, 
+                node.visit_count += 1
+
                 # added by Matt to fix bug
                 if node.is_turn_complete:
                     node.value_sum += value if node.to_play == to_play else -value
-                    node.visit_count += 1
-                    min_max_stats.update(node.reward + self.config.discount * -node.value())
+                    if node.visit_count > 0: #added by Mattr
+                        min_max_stats.update(node.reward + self.config.discount * -node.value())
 
                 value = (
                     -node.reward if node.to_play == to_play else node.reward

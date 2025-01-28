@@ -43,10 +43,10 @@ class MuZeroConfig:
 
 
         ### Self-Play
-        self.num_workers = 10  # Number of simultaneous threads/workers self-playing to feed the replay buffer
+        self.num_workers = 11  # Number of simultaneous threads/workers self-playing to feed the replay buffer
         self.selfplay_on_gpu = False
         self.max_moves = 4000  # Maximum number of moves if game is not finished before
-        self.num_simulations = 30  # Number of future moves self-simulated
+        self.num_simulations = 15  # Number of future moves self-simulated
         self.discount = 0.997  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping the temperature given by visit_softmax_temperature_fn to 0 (ie selecting the best action). If None, visit_softmax_temperature_fn is used every time
 
@@ -55,7 +55,7 @@ class MuZeroConfig:
         self.root_exploration_fraction = 0.25
 
         # UCB formula
-        self.pb_c_base = 19652
+        self.pb_c_base = 5000 #19652
         self.pb_c_init = 1.25
 
         ### Network
@@ -65,13 +65,13 @@ class MuZeroConfig:
         # Residual Network
         self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
         self.blocks = 6  # Number of blocks in the ResNet
-        self.channels = 128  # Number of channels in the ResNet
-        self.reduced_channels_reward = 64  # Number of channels in reward head
-        self.reduced_channels_value = 64  # Number of channels in value head
-        self.reduced_channels_policy = 64  # Number of channels in policy head
-        self.resnet_fc_reward_layers = [512, 256]  # Define the hidden layers in the reward head of the dynamic network
-        self.resnet_fc_value_layers = [512, 256]  # Define the hidden layers in the value head of the prediction network
-        self.resnet_fc_policy_layers = [1024, 512]  # Define the hidden layers in the policy head of the prediction network
+        self.channels = 32  # Number of channels in the ResNet
+        self.reduced_channels_reward = 16  # Number of channels in reward head
+        self.reduced_channels_value = 16  # Number of channels in value head
+        self.reduced_channels_policy = 16  # Number of channels in policy head
+        self.resnet_fc_reward_layers = [32, 16]  # Define the hidden layers in the reward head of the dynamic network
+        self.resnet_fc_value_layers =  [64, 32]  # Define the hidden layers in the value head of the prediction network
+        self.resnet_fc_policy_layers = [128, 64]  # Define the hidden layers in the policy head of the prediction network
 
         # Fully Connected Network
         self.encoding_size = 64
@@ -79,15 +79,15 @@ class MuZeroConfig:
         self.fc_dynamics_layers = [128, 64]  # Define the hidden layers in the dynamics network
         self.fc_reward_layers = [64, 32]  # Define the hidden layers in the reward network
         self.fc_value_layers = [64, 32]  # Define the hidden layers in the value network
-        self.fc_policy_layers = [128, 64]  # Define the hidden layers in the policy network
+        self.fc_policy_layers = [64, 32]  # Define the hidden layers in the policy network
 
 
 
         ### Training
         self.results_path = pathlib.Path(__file__).resolve().parents[1] / "results" / pathlib.Path(__file__).stem / datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")  # Path to store the model weights and TensorBoard logs
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
-        self.training_steps = int(10e3)  # Total number of training steps (ie weights update according to a batch)
-        self.batch_size = 2048  # Number of parts of games to train on at each training step
+        self.training_steps = int(5e3)  # Total number of training steps (ie weights update according to a batch)
+        self.batch_size = 4096  # Number of parts of games to train on at each training step
         self.checkpoint_interval = 250  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
@@ -108,10 +108,10 @@ class MuZeroConfig:
         self.num_unroll_steps = 5  # Number of game moves to keep for every batch element
         self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 1  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.6 #1  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
-        self.use_last_model_value = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.reanalyse_on_gpu = False
 
         ### Adjust the self play / training ratio to avoid over/underfitting
@@ -146,8 +146,7 @@ class Game(AbstractGame):
         self.last_action = "None"
         if seed is not None:
             self.bg_game.randomize_seed(seed)
-        self.legal_actions_cache = []
-
+        
     def human_to_action(self):
         """
         For multiplayer games, ask the user for a legal action
@@ -161,11 +160,11 @@ class Game(AbstractGame):
         #get list of descriptions for each choice
     
    
-        self.legal_actions_cache = self.bg_game.legal_actions()
+        legal_actions = self.bg_game.legal_actions()
 
-        self.legal_actions_cache.sort()
+        legal_actions.sort()
         choice_descriptions = {}
-        for a in self.legal_actions_cache:
+        for a in legal_actions:
             d = self.bg_game.action_to_string(a)
             choice_descriptions[a] = d
             print(f"{a}: {d}")
@@ -181,16 +180,14 @@ class Game(AbstractGame):
                 continue
             
             choice_int = int(choice)
-            if choice_int not in self.legal_actions_cache:
+            if choice_int not in legal_actions:
                 print("Please select from available actions.")
                 continue
 
             found = True
 
-
-
  
-        if choice_int in choice_descriptions:
+        if choice_int in legal_actions:
             self.last_action = choice_descriptions[choice_int]
         return int(choice)
 
@@ -223,8 +220,7 @@ class Game(AbstractGame):
         Returns:
             An array of integers, subset of the action space.
         """
-        self.legal_actions_cache = self.bg_game.legal_actions()
-        return self.legal_actions_cache
+        return self.bg_game.legal_actions()
 
     def reset(self):
         """

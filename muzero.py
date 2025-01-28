@@ -337,9 +337,9 @@ class MuZero:
                 cpu_percent = psutil.cpu_percent()
                 memory = psutil.virtual_memory()
 
-                writer.add_scalar('4.System/CPU_Usage', cpu_percent)
-                writer.add_scalar('4.System/Memory_Used_GB', memory.used / (1024**3))
-                writer.add_scalar('4.System/Memory_Percent', memory.percent)
+                writer.add_scalar('4.System/CPU_Usage', cpu_percent, counter)
+                writer.add_scalar('4.System/Memory_Used_GB', memory.used / (1024**3), counter)
+                writer.add_scalar('4.System/Memory_Percent', memory.percent, counter)
 
                 if gpu_stats_available:
                     result = subprocess.check_output(['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,fan.speed,power.draw', '--format=csv,nounits,noheader'])
@@ -347,13 +347,13 @@ class MuZero:
                     
                     gpu_mem_percent = (gpu_mem_used / gpu_mem_total) * 100
                     
-                    writer.add_scalar('5.GPU/Utilization', gpu_util)
-                    writer.add_scalar('5.GPU/Memory_Percent', gpu_mem_percent)
-                    writer.add_scalar('5.GPU/Memory_Used', gpu_mem_used)
-                    writer.add_scalar('5.GPU/Memory_Total', gpu_mem_total)
-                    writer.add_scalar('5.GPU/Temperature', gpu_temp)
-                    writer.add_scalar('5.GPU/Fan_Speed', gpu_fan)
-                    writer.add_scalar('5.GPU/Power_Watts', gpu_power)
+                    writer.add_scalar('5.GPU/Utilization', gpu_util, counter)
+                    writer.add_scalar('5.GPU/Memory_Percent', gpu_mem_percent, counter)
+                    writer.add_scalar('5.GPU/Memory_Used', gpu_mem_used, counter)
+                    writer.add_scalar('5.GPU/Memory_Total', gpu_mem_total, counter)
+                    writer.add_scalar('5.GPU/Temperature', gpu_temp, counter)
+                    writer.add_scalar('5.GPU/Fan_Speed', gpu_fan, counter)
+                    writer.add_scalar('5.GPU/Power_Watts', gpu_power, counter)
 
                 print(
                     f'Last test reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}/{self.config.training_steps}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
