@@ -19,6 +19,8 @@ import replay_buffer
 import self_play
 import shared_storage
 import trainer
+import psutil
+import subprocess
 
 
 class MuZero:
@@ -207,6 +209,13 @@ class MuZero:
                 num_gpus_per_worker if self.config.selfplay_on_gpu else 0,
             )
 
+    def gpu_stats_available(self):
+        try:
+            subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE, check=True)
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return False
+
     def logging_loop(self, num_gpus):
         """
         Keep track of the training performance.
@@ -227,6 +236,10 @@ class MuZero:
 
         # Write everything in TensorBoard
         writer = SummaryWriter(self.config.results_path)
+
+        #check if GPU available
+        gpu_stats_available = self.gpu_stats_available()
+        
 
         print(
             "\nTraining...\nRun tensorboard --logdir ./results and go to http://localhost:6006/ to see in real time the training performance.\n"
@@ -320,6 +333,28 @@ class MuZero:
                 writer.add_scalar("3.Loss/Value_loss", info["value_loss"], counter)
                 writer.add_scalar("3.Loss/Reward_loss", info["reward_loss"], counter)
                 writer.add_scalar("3.Loss/Policy_loss", info["policy_loss"], counter)
+
+                cpu_percent = psutil.cpu_percent()
+                memory = psutil.virtual_memory()
+
+                writer.add_scalar('4.System/CPU_Usage', cpu_percent)
+                writer.add_scalar('4.System/Memory_Used_GB', memory.used / (1024**3))
+                writer.add_scalar('4.System/Memory_Percent', memory.percent)
+
+                if gpu_stats_available:
+                    result = subprocess.check_output(['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,fan.speed,power.draw', '--format=csv,nounits,noheader'])
+                    gpu_util, gpu_mem_used, gpu_mem_total, gpu_temp, gpu_fan, gpu_power = map(float, result.decode('utf-8').strip().split(','))
+                    
+                    gpu_mem_percent = (gpu_mem_used / gpu_mem_total) * 100
+                    
+                    writer.add_scalar('5.GPU/Utilization', gpu_util)
+                    writer.add_scalar('5.GPU/Memory_Percent', gpu_mem_percent)
+                    writer.add_scalar('5.GPU/Memory_Used', gpu_mem_used)
+                    writer.add_scalar('5.GPU/Memory_Total', gpu_mem_total)
+                    writer.add_scalar('5.GPU/Temperature', gpu_temp)
+                    writer.add_scalar('5.GPU/Fan_Speed', gpu_fan)
+                    writer.add_scalar('5.GPU/Power_Watts', gpu_power)
+
                 print(
                     f'Last test reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}/{self.config.training_steps}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
                     end="\r",

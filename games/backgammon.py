@@ -37,7 +37,9 @@ class MuZeroConfig:
         # Evaluate
         self.muzero_player = 0  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
         self.opponent = "random"  # Hard coded agent that MuZero faces to assess his progress in multiplayer games. It doesn't influence training. None, "random" or "expert" if implemented in the Game class
-        self.agent_multiaction = True  # If the agent can play multiple actions per step
+        self.player_multiactions_per_turn = True  # If the agent can play multiple actions per step
+        self.player_end_turn_action = 30 # For multi actions per player turn, we have to have the ai explicity end their turn.  this actually will come in handy when implementing dice doubling
+        
 
 
         ### Self-Play
