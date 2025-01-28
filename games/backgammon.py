@@ -43,10 +43,10 @@ class MuZeroConfig:
 
 
         ### Self-Play
-        self.num_workers = 10  # Number of simultaneous threads/workers self-playing to feed the replay buffer
+        self.num_workers = 8  # Number of simultaneous threads/workers self-playing to feed the replay buffer
         self.selfplay_on_gpu = False
         self.max_moves = 4000  # Maximum number of moves if game is not finished before
-        self.num_simulations = 20  # Number of future moves self-simulated
+        self.num_simulations = 30  # Number of future moves self-simulated
         self.discount = 0.997  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping the temperature given by visit_softmax_temperature_fn to 0 (ie selecting the best action). If None, visit_softmax_temperature_fn is used every time
 
@@ -146,7 +146,7 @@ class Game(AbstractGame):
         self.last_action = "None"
         if seed is not None:
             self.bg_game.randomize_seed(seed)
-        self.legal_actions = []
+        self.legal_actions_cache = []
 
     def human_to_action(self):
         """
@@ -161,21 +161,37 @@ class Game(AbstractGame):
         #get list of descriptions for each choice
     
    
-        self.legal_actions = self.bg_game.legal_actions()
+        self.legal_actions_cache = self.bg_game.legal_actions()
 
-        self.legal_actions.sort()
+        self.legal_actions_cache.sort()
         choice_descriptions = {}
-        for a in self.legal_actions:
+        for a in self.legal_actions_cache:
             d = self.bg_game.action_to_string(a)
             choice_descriptions[a] = d
             print(f"{a}: {d}")
 
-        choice = input(f"Enter the action to play for the player {self.to_play()}: ")
+        
         # check if input is an integer
+        found = False
 
-        while not choice.isdigit() and int(choice) not in self.legal_actions:
-            choice = input("Illegal action. Enter another action : ")
-        self.last_action = choice_descriptions[int(choice)]
+        while not found:
+            choice = input(f"Enter the action to play for the player {self.to_play()}: ")
+            if not choice.isdigit():
+                print("Input must be a digt")
+                continue
+            
+            choice_int = int(choice)
+            if choice_int not in self.legal_actions_cache:
+                print("Please select from available actions.")
+                continue
+
+            found = True
+
+
+
+ 
+        if choice_int in choice_descriptions:
+            self.last_action = choice_descriptions[choice_int]
         return int(choice)
 
 
@@ -207,8 +223,8 @@ class Game(AbstractGame):
         Returns:
             An array of integers, subset of the action space.
         """
-        self.legal_actions = self.bg_game.legal_actions()
-        return self.legal_actions
+        self.legal_actions_cache = self.bg_game.legal_actions()
+        return self.legal_actions_cache
 
     def reset(self):
         """
