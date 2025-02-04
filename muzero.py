@@ -87,7 +87,7 @@ class MuZero:
             total_gpus = (
                 self.config.max_num_gpus
                 if self.config.max_num_gpus is not None
-                else torch.cuda.device_count()
+                else torch.accelerator.device_count()
             )
         else:
             total_gpus = 0
@@ -239,6 +239,11 @@ class MuZero:
 
         #check if GPU available
         gpu_stats_available = self.gpu_stats_available()
+
+        start_time = time.time()
+        starting_step = 0
+        starting_game = 0
+        captured_first_stats = False
         
 
         print(
@@ -277,9 +282,17 @@ class MuZero:
             "num_reanalysed_games",
         ]
         info = ray.get(self.shared_storage_worker.get_info.remote(keys))
+        sleep_time = 1
         try:
             while info["training_step"] < self.config.training_steps:
                 info = ray.get(self.shared_storage_worker.get_info.remote(keys))
+                
+                if not captured_first_stats:
+                    starting_game = info["num_played_games"]
+                    starting_step = info["training_step"]
+                    captured_first_stats = True
+                
+                
                 writer.add_scalar(
                     "1.Total_reward/1.Total_reward",
                     info["total_reward"],
@@ -355,12 +368,26 @@ class MuZero:
                     writer.add_scalar('5.GPU/Fan_Speed', gpu_fan, counter)
                     writer.add_scalar('5.GPU/Power_Watts', gpu_power, counter)
 
+                elapsed_time = time.time() - start_time
+                games_per_sec = (info["num_played_games"] - starting_game) / elapsed_time
+                # Calculate frames per second in thousands (kFrames/s)
+                frames_k_per_sec = (((info["training_step"] - starting_step) * self.config.batch_size) / elapsed_time) / 1000
+
                 print(
-                    f'Last test reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}/{self.config.training_steps}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
+                    f'Last test reward: {info["total_reward"]:.2f}. '
+                    f'Training step: {info["training_step"]}/{self.config.training_steps}. '
+                    f'Played games: {info["num_played_games"]}. '
+                    f'Loss: {info["total_loss"]:.2f}. '
+                    f'Games/s: {games_per_sec:.2f}, kFrames/s: {frames_k_per_sec:.2f}',
                     end="\r",
                 )
+                
+                #print(
+                #    f'Last test reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}/{self.config.training_steps}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
+                #    end="\r",
+                #)
                 counter += 1
-                time.sleep(0.5)
+                time.sleep(sleep_time)
         except KeyboardInterrupt:
             pass
 

@@ -25,8 +25,33 @@ class SelfPlay:
         # Initialize the network
         self.model = models.MuZeroNetwork(self.config)
         self.model.set_weights(initial_checkpoint["weights"])
-        self.model.to(torch.device("cuda" if self.config.selfplay_on_gpu else "cpu"))
+        # Determine device based on selfplay_on_gpu flag and available hardware
+        device = None
+        if self.config.selfplay_on_gpu:
+            try:
+                # Attempt to use the new accelerator API (if available in your PyTorch version)
+                from torch.accelerator import Accelerator
+                accelerator = Accelerator()
+                device = accelerator.device
+            except ImportError:
+                # Check for Apple's MPS support (for Macs with Apple Silicon)
+                if torch.backends.mps.is_available():
+                    device = torch.device("mps")
+                # Next, check for CUDA availability
+                elif torch.cuda.is_available():
+                    device = torch.device("cuda")
+                else:
+                    device = torch.device("cpu")
+        else:
+            device = torch.device("cpu")
+
+        # Move the model to the selected device and set it to evaluation mode
+        self.model.to(device)
         self.model.eval()
+
+        # Optionally print which device is being used
+        if device.type not in ["cuda", "mps"]:
+            print("You are not using an accelerated GPU device (CUDA or MPS).")
 
     def continuous_self_play(self, shared_storage, replay_buffer, test_mode=False):
         while ray.get(

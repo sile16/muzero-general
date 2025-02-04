@@ -25,13 +25,31 @@ class Trainer:
         # Initialize the network
         self.model = models.MuZeroNetwork(self.config)
         self.model.set_weights(copy.deepcopy(initial_checkpoint["weights"]))
-        self.model.to(torch.device("cuda" if self.config.train_on_gpu else "cpu"))
+        
+        # Select device in a hardware-agnostic manner
+        try:
+            # Attempt to use the new accelerator API
+            from torch.accelerator import Accelerator
+            accelerator = Accelerator()
+            device = accelerator.device
+        except ImportError:
+            # Fallback: use MPS if available, then CUDA, otherwise CPU
+            if torch.backends.mps.is_available():
+                device = torch.device("mps")
+            elif torch.cuda.is_available():
+                device = torch.device("cuda")
+            else:
+                device = torch.device("cpu")
+
+        # Move model to the selected device and set it to training mode
+        self.model.to(device)
         self.model.train()
 
         self.training_step = initial_checkpoint["training_step"]
 
-        if "cuda" not in str(next(self.model.parameters()).device):
-            print("You are not training on GPU.\n")
+        # Inform if not running on a GPU or hardware accelerator
+        if device.type not in ["cuda", "mps"]:
+            print("You are not training on a GPU or hardware accelerator.\n")
 
         # Initialize the optimizer
         if self.config.optimizer == "SGD":
